@@ -3,10 +3,10 @@
   "format": "html",
   "prefix": "https://storage.googleapis.com",
   "mainga": "UA-49880327-14",
-  "updated": "2025-04-22T06:41:37-04:00",
-  "id": "how-to-integrete-zoom-app-sdk",
+  "updated": "2025-05-12T05:39:44-04:00",
+  "id": "how-to-integrate-zoom-app-sdk",
   "duration": 0,
-  "title": "# Integrate multi-feature app integration: Zoom App SDK",
+  "title": "Integrate multi-feature app integration: Zoom App SDK",
   "authors": "Donte",
   "summary": "How to integrate Zoom App SDK",
   "source": "08_integrate-zoom-app.md",
@@ -21,5 +21,5 @@
     "medium"
   ],
   "feedback": "https://devforum.zoom.us/c/zoom-apps",
-  "url": "how-to-integrete-zoom-app-sdk"
+  "url": "how-to-integrate-zoom-app-sdk"
 }
