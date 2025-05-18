@@ -153,37 +153,24 @@ export const signInWithZoomApp = async () =&gt; {
 </code></pre>
 <h2 is-upgraded>Hide &#34;Sign in with Zoom&#34; Button</h2>
 <p>Path:</p>
-<pre><code language="language-javascript" class="language-javascript">app/page.tsx
+<pre><code language="language-javascript" class="language-javascript">components/auth/header-auth.tsx
 </code></pre>
-<pre><code language="language-javascript" class="language-javascript">import Hero from &#39;@/components/hero&#39;
-import {headers} from &#34;next/headers&#34;;
-import dynamic from &#34;next/dynamic&#34;;
+<pre><code language="language-javascript" class="language-javascript">return (
+    &lt;div className=&#34;flex gap-2&#34;&gt;
+      {!isZoom &amp;&amp; (
+        &lt;Button onClick={signInWithZoom}&gt;
+          Sign in With Zoom
+        &lt;/Button&gt;
+      )}
+    &lt;/div&gt;
+  );
 
-
-export default async function Page() {
-    let Zoom;
-
-    const headersList = await headers();
-    const isZoom = headersList.has(&#39;x-zoom-app-device-type&#39;);
-
-    const loadZoomApp = () =&gt; {
-        if (!isZoom) return &lt;div&gt;Zoom App Landing Page&lt;/div&gt;;
-
-        Zoom = dynamic(() =&gt; import(&#39;@/components/zoom-app&#39;));
-
-        return ( &lt;Zoom /&gt;)
-    }
-
-    return (
-        &lt;div&gt;
-            &lt;Hero&gt;&lt;/Hero&gt;
-            
-            {loadZoomApp()}
-           
-        &lt;/div&gt;
-    )
-}
-
+</code></pre>
+<h2 is-upgraded>Hide &#34;Sign in with Zoom&#34; Button</h2>
+<p>Path</p>
+<pre><code>app/page.tsx
+</code></pre>
+<pre><code language="language-javascript" class="language-javascript">if (!isZoom) return &lt;div&gt;Zoom App Landing Page&lt;/div&gt;;
 </code></pre>
 <h2 is-upgraded>Middleware:  Zoom x-zoom-app-context Header and Cache management</h2>
 <p>Path:</p>
