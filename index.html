@@ -48,7 +48,12 @@
       </google-codelab-step>
     
       <google-codelab-step label="What you&#39;ll learn" duration="0">
-        <p>//TO-DO</p>
+        <p>Build a Zoom App with integrated authorization flows for both Zoom and third-party services using Supabase.</p>
+<ul>
+<li>How to implement secure session management and authentication using middleware, Redis, and Supabase tokens</li>
+<li>How to create deep linking functionality to seamlessly connect external apps with the Zoom client</li>
+<li>How to handle URL parameters, context decryption, and state management in a Zoom App environment</li>
+</ul>
 <h2 is-upgraded>What you&#39;ll need</h2>
 <ul>
 <li>Git</li>
@@ -61,6 +66,7 @@
 <li>A Zoom Developer Account</li>
 <li>A Supabase Account</li>
 <li>A Ngrok Account</li>
+<li>A Upstash Account (Redis Cache)</li>
 </ul>
 
 
@@ -72,7 +78,7 @@
 </ol>
 <pre><code language="language-bash" class="language-bash">git clone https://github.com/zoom/task-manager-sample.git
 cd task-manager-sample
-git checkout step-6-slash-command
+git checkout step-7-zoom-app-integration
 
 </code></pre>
 <ol type="1" start="2">
@@ -87,8 +93,606 @@ npm run dev
 
       </google-codelab-step>
     
+      <google-codelab-step label="Overview: Zoom App Integration" duration="0">
+        <p>This sample app includes reusable Redis cache, Zoom Rest API, and Zoom App helpers utility functions located in the app/lib folder. These functions help streamline chatbot, teamchat, cache management, and zoom rest api calls across both client and server environments.</p>
+<table>
+<tr><td colspan="1" rowspan="1"><p>File Path</p>
+</td><td colspan="1" rowspan="1"><p>Purpose</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><code>app/lib/chatbot.ts</code></p>
+</td><td colspan="1" rowspan="1"><p>Provides utility functions for interacting with Zoom Team Chatbot.</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><code>app/lib/teamchat.ts</code></p>
+</td><td colspan="1" rowspan="1"><p>Provides utility functions for interacting with Zoom Team Chat.</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><code>app/lib/token-store.js</code></p>
+</td><td colspan="1" rowspan="1"><p>Provides utility functions for interacting with Redis management.</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><code>app/lib/zoom-api.ts</code></p>
+</td><td colspan="1" rowspan="1"><p>Provides utility functions for interacting with the Zoom REST API across Zoom Workplace products</p>
+</td></tr>
+<tr><td colspan="1" rowspan="1"><p><code>app/lib/zoom-helper.ts</code></p>
+</td><td colspan="1" rowspan="1"><p>Provides utility functions for decrypting the X-Zoom-App-Context header value.</p>
+</td></tr>
+</table>
+<h2 is-upgraded>Resources</h2>
+<ul>
+<li><a href="https://developers.zoom.us/docs/team-chat/" target="_blank">Team Chat </a><ul>
+<li><a href="https://developers.zoom.us/docs/api/chatbot/#tag/chatbot-messages/DELETE/im/chat/messages/%7Bmessage_id%7D" target="_blank">Chatbot endpoints</a></li>
+<li><a href="https://developers.zoom.us/docs/api/team-chat/#tag/chat-messages" target="_blank">Team Chat endpoints</a></li>
+</ul>
+</li>
+<li><a href="https://upstash.com/" target="_blank">Upstash: Redis management</a></li>
+<li><a href="https://developers.zoom.us/docs/api/" target="_blank">Zoom API reference</a></li>
+<li><a href="https://developers.zoom.us/docs/zoom-apps/zoom-app-context/#decrypting-the-header-value" target="_blank">Zoom Apps Context: Decrypting the header value</a></li>
+</ul>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Zoom App In-Client Home Page: Utilities" duration="0">
+        <h2 is-upgraded>Supabase Server Actions</h2>
+<p>Path:</p>
+<pre><code language="language-javascript" class="language-javascript">app/actions.ts
+</code></pre>
+<pre><code language="language-javascript" class="language-javascript">import crypto from &#34;crypto&#34;;
+
+....
+export const signInWithZoomApp = async () =&gt; {
+  const headerList = await headers();
+  const origin = headerList.get(&#34;origin&#34;);
+
+  // Generate state add to the URL
+  const state = crypto.randomBytes(12).toString(&#34;hex&#34;); // 24 characters
+  console.log(&#34;\n&#34;,&#34;Generated state for third-party Auth:&#34;, state, &#39;\n&#39;);
+  const zoomAppRedirect = `${origin}/zoom/launch?state=${state}`;
+  const supabaseAuthUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/authorize?provider=zoom&amp;redirect_to=${encodeURIComponent(zoomAppRedirect)}`;
+  
+  return { url: supabaseAuthUrl };
+};
+</code></pre>
+<h2 is-upgraded>Hide &#34;Sign in with Zoom&#34; Button</h2>
+<p>Path:</p>
+<pre><code language="language-javascript" class="language-javascript">app/page.tsx
+</code></pre>
+<pre><code language="language-javascript" class="language-javascript">import Hero from &#39;@/components/hero&#39;
+import {headers} from &#34;next/headers&#34;;
+import dynamic from &#34;next/dynamic&#34;;
+
+
+export default async function Page() {
+    let Zoom;
+
+    const headersList = await headers();
+    const isZoom = headersList.has(&#39;x-zoom-app-device-type&#39;);
+
+    const loadZoomApp = () =&gt; {
+        if (!isZoom) return &lt;div&gt;Zoom App Landing Page&lt;/div&gt;;
+
+        Zoom = dynamic(() =&gt; import(&#39;@/components/zoom-app&#39;));
+
+        return ( &lt;Zoom /&gt;)
+    }
+
+    return (
+        &lt;div&gt;
+            &lt;Hero&gt;&lt;/Hero&gt;
+            
+            {loadZoomApp()}
+           
+        &lt;/div&gt;
+    )
+}
+
+</code></pre>
+<h2 is-upgraded>Middleware:  Zoom x-zoom-app-context Header and Cache management</h2>
+<p>Path:</p>
+<pre><code language="language-javascript" class="language-javascript">middleware.ts
+</code></pre>
+<pre><code language="language-javascript" class="language-javascript">import { type NextRequest, NextResponse } from &#34;next/server&#34;;
+import { updateSession } from &#34;@/utils/supabase/middleware&#34;;
+import { upsertSupabaseUser } from &#34;@/app/lib/token-store&#34;;
+
+export async function middleware(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  const zoomHeader = request.headers.get(&#34;x-zoom-app-context&#34;);
+
+  if (zoomHeader) {
+    console.log(&#34;__________________________Middleware Event________________________\n&#34;);
+    console.log(&#34;📬  Zoom x-zoom-app-context Header:\n&#34;, zoomHeader, &#34;\n&#34;);
+  }
+  
+  // Extract query parameters
+  let access_token = url.searchParams.get(&#34;access_token&#34;);
+  let refresh_token = url.searchParams.get(&#34;refresh_token&#34;);
+  const state = url.searchParams.get(&#34;state&#34;) || &#34;unknown&#34;;
+
+  // Fallback parsing for malformed query strings (e.g. fragments misrouted as queries)
+  if (!access_token || !refresh_token) {
+    const rawSearch = url.search; // includes &#39;?&#39;
+    const decodedSearch = decodeURIComponent(rawSearch.replace(/^\?/, &#34;&#34;));
+    const fragmentParams = new URLSearchParams(decodedSearch);
+
+    access_token = access_token || fragmentParams.get(&#34;access_token&#34;) || fragmentParams.get(&#34;#access_token&#34;) || fragmentParams.get(&#34;%23access_token&#34;);
+    refresh_token = refresh_token || fragmentParams.get(&#34;refresh_token&#34;);
+  }
+
+  if (access_token &amp;&amp; refresh_token) {
+    console.log(&#39;\n&#39;, &#34;🪪  MW - Access token:&#34;, access_token);
+    console.log(&#34;🔁  MW - Refresh token:&#34;, refresh_token);
+    console.log(&#34;🔑  MW - State:&#34;, state, &#34;\n&#34;);
+
+    try {
+      // Store tokens in Redis with a TTL of 1 hour from now
+      const expiresAt = Date.now() + 3600 * 1000;
+      await upsertSupabaseUser(state, access_token, refresh_token, expiresAt);
+      console.log(&#34;✅ Middleware: Tokens stored in Redis - state: &#34;, state, &#34;\n&#34;);
+    } catch (error) {
+      console.error(&#34;❌ Middleware: Failed to store tokens in Redis:&#34;, error);
+    }
+  
+
+    // Clean up tokens from URL and redirect
+    url.searchParams.delete(&#34;access_token&#34;);
+    url.searchParams.delete(&#34;refresh_token&#34;);
+    url.pathname = &#34;/dashboard&#34;;
+
+    return NextResponse.redirect(url);
+  }
+
+
+  // Continue normal Supabase session logic
+  const response = await updateSession(request);
+  return response;
+}
+
+export const config = {
+  matcher: [
+    &#34;/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)&#34;,
+  ],
+};
+
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Zoom App In-Client Home Page" duration="0">
+        <p>Path:</p>
+<pre><code language="language-javascript" class="language-javascript">components/zoom-app.tsx
+</code></pre>
+<pre><code language="language-javascript" class="language-javascript">&#34;use client&#34;;
+
+import { useEffect, useState, useRef } from &#34;react&#34;;
+import { useRouter } from &#39;next/router&#39;;
+import zoomSdk from &#34;@zoom/appssdk&#34;;
+import { usePathname } from &#34;next/navigation&#34;;
+import { createClient } from &#34;@/utils/supabase/client&#34;;
+import { Button } from &#34;./ui/button&#34;;
+
+import {signInWithZoomApp } from &#34;@/app/actions&#34;;
+import {getSupabaseUser } from &#34;@/app/lib/token-store&#34;;
+
+import { useSearchParams } from &#34;next/navigation&#34;;
+ 
+export default function ZoomAuth() {
+  console.log(&#34;__________________________ Zoom App Home Page _______________________&#34;, &#34;\n&#34;);
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [authStatus, setAuthStatus] = useState&lt;&#34;idle&#34; | &#34;success&#34; | &#34;error&#34; | &#34;loading&#34;&gt;(&#34;idle&#34;);
+  const location = usePathname();
+
+  //get state from the URL
+  const searchParams = useSearchParams();
+  const state = searchParams.get(&#34;state&#34;);
+  console.log(&#34;🪵 State from query params:&#34;, state, &#34;\n&#34;);
+
+  // Ref to dynamically assign the correct onAuthorized handler
+  const authorizedHandlerRef = useRef&lt;(event: any) =&gt; void&gt;(() =&gt; {});
+
+  const initializeZoomSDK = async () =&gt; {
+    try {
+      await zoomSdk.config({
+        capabilities: [
+          &#34;authorize&#34;,
+          &#34;onAuthorized&#34;,
+          &#34;promptAuthorize&#34;,
+          &#34;getUserContext&#34;,
+          &#34;onMyUserContextChange&#34;,
+          &#34;openUrl&#34;,
+        ],
+      });
+
+      zoomSdk.addEventListener(&#34;onAuthorized&#34;, (event) =&gt; {
+        console.log(&#34;🎯 onAuthorized triggered&#34;, event);
+        authorizedHandlerRef.current(event);
+      });
+
+      setIsConfigured(true);
+      console.log(&#34;✅ Zoom SDK configured&#34;);
+    } catch (error) {
+      console.error(&#34;❌ Zoom SDK config error:&#34;, error);
+    }
+  };
+
+ 
+  const handleZoomInClientAuthorization = async (event: any) =&gt; {
+    console.log(&#34;📥 Zoom In-Client OAuth Authorization Event:&#34;, event);
+    // Handle the Zoom In-Client authorization result here
+    // You can exchange `event.code` with your backend if needed
+    setAuthStatus(&#34;success&#34;);
+  };
+
+  const authorizeViaZoomClient = async () =&gt; {
+     // OAuth PKCE values (normally you&#39;d generate these securely)
+    const code_challenge = &#34;ZjBjMDdjYWEwODJkYjQ0NDZjNDEwODc0MzljYjA2ZGRlYTk3YzM0YmI3YzljZDVjNTcxOTI0NzMyODhhMmZhYg==&#34;;
+    const hardcodedState = &#34;TIA5UgoMte&#34;;
+
+    try {
+      authorizedHandlerRef.current = handleZoomInClientAuthorization;
+      setAuthStatus(&#34;loading&#34;);
+
+      await zoomSdk.authorize({
+        codeChallenge: code_challenge,
+        state: hardcodedState,
+      });
+    } catch (error) {
+      console.error(&#34;❌ Zoom SDK authorize error:&#34;, error);
+      setAuthStatus(&#34;error&#34;);
+    }
+  };
+
+  const handleRawSupabaseOAuth = async () =&gt; {
+    try {
+      setAuthStatus(&#34;loading&#34;);
+      const { url } = await signInWithZoomApp();
+      await zoomSdk.openUrl({ url: url });
+      console.log(&#34;✅ Opened raw Supabase OAuth URL:&#34;, url);
+      setAuthStatus(&#34;success&#34;);
+    } catch (error) {
+      console.error(&#34;❌ Error opening raw Supabase auth URL:&#34;, error);
+      setAuthStatus(&#34;error&#34;);
+    }
+  };
+
+  const setSupabaseSessionFromCache = async () =&gt; {
+    const hardcodedState = state;
+  
+    try {
+      const tokenData = await getSupabaseUser(hardcodedState);
+      console.log(&#34;🔐 Token data from Redis:&#34;, tokenData);
+  
+      if (!tokenData.accessToken || !tokenData.refreshToken) {
+        console.error(&#34;❌ Token data incomplete.&#34;);
+        return;
+      }
+  
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.setSession({
+        access_token: tokenData.accessToken,
+        refresh_token: tokenData.refreshToken,
+      });
+  
+      if (error) {
+        console.error(&#34;❌ Supabase session set error:&#34;, error.message);
+        return;
+      }
+  
+      console.log(&#34;✅ Supabase session set successfully from Redis cache.&#34;);
+      window.location.href = &#34;/dashboard&#34;;
+    } catch (err) {
+      console.error(&#34;❌ Failed to get Supabase tokens from cache:&#34;, err);
+    }
+  };
+  
+  useEffect(() =&gt; {
+    initializeZoomSDK();
+    setSupabaseSessionFromCache();
+    return () =&gt; {
+      console.log(&#34;🧹 Cleaning up Zoom SDK event listeners:&#34;, authorizedHandlerRef.current);
+      // zoomSdk.removeEventListener(&#34;onAuthorized&#34;, authorizedHandlerRef.current);
+    
+    };
+  }, []);
+
+  return (
+    &lt;&gt;
+      &lt;p&gt;You are on this route: {location}&lt;/p&gt;
+
+      &lt;div className=&#34;flex flex-col gap-3 mt-4&#34;&gt;
+        &lt;Button onClick={authorizeViaZoomClient} disabled={!isConfigured || authStatus === &#34;loading&#34;}&gt;
+          {authStatus === &#34;loading&#34; ? &#34;Authorizing...&#34; : &#34;Authorize with Zoom In-Client Flow&#34;}
+        &lt;/Button&gt;
+
+
+        &lt;Button onClick={handleRawSupabaseOAuth} disabled={!isConfigured || authStatus === &#34;loading&#34;}&gt;
+          {authStatus === &#34;loading&#34; ? &#34;Authorizing...&#34; : &#34;Authorize with Raw Supabase URL&#34;}
+        &lt;/Button&gt;
+      &lt;/div&gt;
+
+      {authStatus === &#34;success&#34; &amp;&amp; &lt;p&gt;✅ Redirecting...&lt;/p&gt;}
+      {authStatus === &#34;error&#34; &amp;&amp; &lt;p className=&#34;text-red-600&#34;&gt;❌ Login failed. Please try again.&lt;/p&gt;}
+    &lt;/&gt;
+  );
+}
+
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Zoom App Event: Zoom App Home URL" duration="0">
+        <p>Path:</p>
+<pre><code language="language-javascript" class="language-javascript">app/api/zoom/entry/route.ts
+</code></pre>
+<h3 is-upgraded>Get Route</h3>
+<pre><code language="language-javascript" class="language-javascript">import { type NextRequest, NextResponse } from &#34;next/server&#34;;
+import { decryptZoomAppContext } from &#34;@/app/lib/zoom-helper&#34;;
+import { updateSession } from &#34;@/utils/supabase/middleware&#34;;
+import { getSupabaseUser } from &#34;@/app/lib/token-store&#34;;
+
+export async function GET(request: NextRequest) {
+  console.log(&#34;__________________________Zoom Home Page Get Route________________________&#34;, &#34;\n&#34;);
+  const response = await updateSession(request);
+  const { searchParams, origin } = new URL(request.url);
+  const url = request.url;
+  const zoomHeader = request.headers.get(&#34;x-zoom-app-context&#34;);
+
+  logRequest(request.url, zoomHeader, searchParams);
+  const parsedAction = handleZoomContext(zoomHeader);
+  const { uid ,state,act} = parsedAction;
+
+  const userId = uid;
+
+  // Handle API mode from client request (no redirect)
+  const result = await handleActParam(act, state);
+  if (result) return result;
+
+  const redirectUrl = buildRedirectUrl(request, searchParams, origin);
+  console.log(&#34;🔄 Redirecting to Zoom Client Home:&#34;, redirectUrl, &#34;\n&#34;);
+
+  return NextResponse.redirect(redirectUrl);
+
+}
+
+function logRequest(url: string, header: string | null, params: URLSearchParams) {
+  console.log(&#34;🔗 Request URL:&#34;, url, &#34;\n&#34;);
+  console.log(&#34;🔍 HomeURL Template Parameters:&#34;);
+  for (const [key, value] of Array.from(params.entries())) {
+    console.log(`• ${key}: ${value}`);
+  }
+  console.log(&#34;\n&#34;,&#34;🚨 Note the Action Parameter will include the State param and deeplink Action!&#34;, &#39;\n&#39;);
+  console.log(&#34;🔑 Zoom Header:&#34;, header, &#34;\n&#34;);
+}
+
+function buildRedirectUrl(request: NextRequest, searchParams: URLSearchParams, origin: string) {
+  const isLocalEnv = process.env.NODE_ENV === &#34;development&#34;;
+  const next = searchParams.get(&#34;next&#34;) ?? &#34;/&#34;;
+  const host = &#34;https://&#34; + request.headers.get(&#34;x-forwarded-host&#34;);
+  return isLocalEnv ? `${host}${next}` : `${origin}${next}`;
+}
+</code></pre>
+<h3 is-upgraded>Handle User-defined action</h3>
+<pre><code language="language-javascript" class="language-javascript">/**
+ * Helper function to handle the &#34;act&#34; parameter logic
+ */
+async function handleActParam(
+  act: { verified?: string } | undefined,
+  state: string | undefined
+): Promise&lt;Response | null&gt; {
+  if (act?.verified === &#34;getToken&#34;) {
+    console.log(&#34;\n&#34;,&#34;⭐️ User-defined Deeplink Action:&#34;, act.verified, );
+    console.log(&#34; 🧠 LEARN MORE: https://developers.zoom.us/docs/api/marketplace/#tag/apps/POST/zoomapp/deeplink&#34;, &#34;\n&#34;);
+
+
+    try {
+      const tokenData = await getSupabaseUser(state);
+      console.log(&#34;🔐 Token retrieved from Redis:&#34;, tokenData, &#34;\n&#34;);
+
+      const redirectUrl = new URL(&#34;https://donte.ngrok.io&#34;);
+      redirectUrl.searchParams.set(&#34;state&#34;, state ?? &#34;&#34;);
+
+      console.log(&#34;🔄 Zoom App Home redirected:&#34;, redirectUrl.toString(), &#34;\n&#34;);
+
+      return NextResponse.redirect(redirectUrl.toString());
+    } catch (e) {
+      console.error(&#34;❌ Failed to retrieve token from Redis:&#34;, e);
+      return NextResponse.redirect(&#34;https://donte.ngrok.io?error=token_not_found&#34;);
+    }
+  }
+
+  return null;
+}
+</code></pre>
+<h3 is-upgraded>Handle Zoom App Context</h3>
+<pre><code language="language-javascript" class="language-javascript">function handleZoomContext(header: string | null): {
+  uid?: string;
+  act?: any;
+  verified?: string;
+  state?: string;
+} {
+  if (!header) {
+    console.log(&#34;ℹ️ No x-zoom-app-context header found. Likely first load in Zoom Client.&#34;);
+    return {};
+  }
+
+  try {
+    const context = decryptZoomAppContext(header, process.env.ZOOM_CLIENT_SECRET!);
+    console.log(&#34;🔐 Decrypted Zoom Context:&#34;, context, &#39;\n&#39;);
+
+    // UID is already a plain string, do not parse
+    const uid = context.uid;
+    if (!uid) {
+      console.log(&#34;⚠️ Zoom Context missing UID — invalid or malformed.&#34;);
+      return {};
+    }
+
+    console.log(&#34;☄️  User ID from Zoom Context:&#34;, uid);
+
+    
+    // Act is optional — deep linking or context-based actions
+    let act: any = undefined;
+    let state: any  = undefined;
+    if (context.act) {
+      try {
+        act = JSON.parse(context.act);
+        console.log(&#34;🎬 Parsed Zoom Action Context:&#34;, act);
+
+        state = act.state 
+        if (act.state) {
+          console.log(&#34;☄️  State from Action Context:&#34;, act.state);
+        } else {
+          console.log(&#34;⚠️ Action Context missing State — invalid or malformed.&#34;);
+        }
+
+      } catch (e) {
+        console.warn(&#34;❌ Failed to parse &#39;act&#39; from context:&#34;, e);
+      }
+    } else {
+      console.log(&#34; ⚠️  No &#39;act&#39; value in Zoom Context — likely a standard app open.&#34;);
+    }
+
+    return {uid,act,state};
+  } catch (error) {
+    console.error(&#34;❌ Failed to process Zoom context:&#34;, error);
+    return {};
+  }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Zoom App External Page" duration="0">
+        <p>Path:</p>
+<pre><code language="language-javascript" class="language-javascript">app/zoom/launch/page.tsx
+</code></pre>
+<pre><code language="language-javascript" class="language-javascript">&#34;use client&#34;;
+
+import { useEffect, useState } from &#34;react&#34;;
+import { getDeeplink } from &#34;@/app/lib/zoom-api&#34;;
+
+export default function ZoomLaunchRedirectHandler() {
+  const [status, setStatus] = useState(&#34;🔄 Signing you in...&#34;);
+  const [deeplink, setDeeplink] = useState&lt;string | undefined&gt;(undefined);
+
+  useEffect(() =&gt; {
+    const run = async () =&gt; {
+      console.log(&#34;__________________________ Zoom App External Page _______________________&#34;, &#34;\n&#34;);
+
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      console.log(&#34;🔗 Supabase Hash Params:&#34;, hashParams.toString(), &#34;\n&#34;);
+
+      const access_token = hashParams.get(&#34;access_token&#34;);
+      const refresh_token = hashParams.get(&#34;refresh_token&#34;);
+      const provider_token = hashParams.get(&#34;provider_token&#34;);
+      const provider_refresh_token = hashParams.get(&#34;provider_refresh_token&#34;);
+
+      const queryParams = new URLSearchParams(window.location.search);
+      const state = queryParams.get(&#34;state&#34;)
+      console.log(&#34;🪵  State from query params:&#34;, state, &#34;\n&#34;);
+
+      console.log(&#34;_____________ Auth Handler Page: Third-party OAuth with Supabase ______________&#34;, &#34;\n&#34;);
+      console.log(&#34;🧠 LEARN MORE: https://developers.zoom.us/docs/zoom-apps/authentication/#third-party-oauth-optional&#34;, &#34;\n&#34;);
+      console.log(&#34;🔑 Extracted Supabase Provider Tokens from URL fragment:&#34;, {
+        access_token,
+        refresh_token,
+        provider_token,
+        provider_refresh_token,
+      });
+
+      if (!access_token || !refresh_token) {
+        setStatus(&#34;❌ Missing access or refresh token&#34;);
+        return;
+      }
+
+      // Construct data to pass to getDeeplink
+      const data = {
+        action: JSON.stringify({ // MAX: 256
+          // url: &#39;/dashboard&#39;,
+          // role_name: &#39;Owner&#39;,
+          // role_id: 0,
+          //refresh_token,
+          //access_token  // Exceed character 256 limit
+          state: state, // TODO: Make dynamic
+          verified: &#39;getToken&#39;,
+        }),
+      };
+
+      console.log(&#39;Redirecting to Zoom client via deeplink . . .&#39;, &#39;\n&#39;)
+      const link = await getDeeplink(provider_token, data);
+      console.log(&#34;🔗 Zoom deeplink:&#34;, link, &#39;\n&#39;);
+
+      if (!link) {
+        setStatus(&#34;❌ Failed to retrieve Zoom deeplink&#34;);
+        return;
+      }
+      setDeeplink(link);
+
+      
+      if (hashParams &amp;&amp; hashParams.toString().length &gt; 0) {
+        console.log(&#34;🔄 &lt;----- Sent query params to Home URL:-----&gt; 🔄 &#34;);
+
+        const supaHashParams = new URLSearchParams(window.location.hash);
+        const res = await fetch(`/api/zoom/entry/?state=${state}&amp;${supaHashParams}`, {
+          method: &#34;GET&#34;,
+          credentials: &#34;include&#34;,
+        });
+
+        // Check if the response is ok
+        //Sent query params to Home URL -- Home Route Will handle token extraction and redirect to the Zoom App
+
+        // ✅ Open in a new tab
+        const newTab = window.open(link, &#34;_blank&#34;);
+        if (!newTab || newTab.closed || typeof newTab.closed === &#34;undefined&#34;) {
+          console.warn(&#34;⚠️ Popup blocked. Showing button fallback.&#34;);
+          setStatus(&#34;⚠️ Please click the button below to open the Zoom App.&#34;);
+        } else {
+          setStatus(&#34;✅ Zoom App opened in new tab.&#34;);
+        }
+
+        return;
+      }
+    };
+
+    run();
+  }, []);
+
+  return (
+    &lt;div className=&#34;p-4 text-center text-sm&#34;&gt;
+      &lt;p&gt;{status}&lt;/p&gt;
+
+      {deeplink &amp;&amp; (
+        &lt;div className=&#34;mt-4&#34;&gt;
+          &lt;button
+            onClick={() =&gt; window.open(deeplink, &#34;_blank&#34;)}
+            className=&#34;bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700&#34;
+          &gt;
+            Open Zoom App
+          &lt;/button&gt;
+        &lt;/div&gt;
+      )}
+    &lt;/div&gt;
+  );
+}
+
+
+</code></pre>
+
+
+      </google-codelab-step>
+    
       <google-codelab-step label="Conclusion" duration="0">
-        <p>//TO-DO</p>
+        <p>Congratulations! You now have a Zoom App Task Manager application built with Next.js that integrates with Supabase for authentication and storage, as well as Zoom Chat and Chatbot.</p>
+<h2 is-upgraded>What Next</h2>
+<ul>
+<li>Zoom Developer Tools - <ul>
+<li>Zoom Workplace Modals</li>
+<li>Customize chatbot messages with App Card Builder</li>
+<li>Threading chat messages and</li>
+<li>App shortcuts</li>
+</ul>
+</li>
+</ul>
 
 
       </google-codelab-step>
