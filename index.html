@@ -131,10 +131,10 @@ npm run dev
       </google-codelab-step>
     
       <google-codelab-step label="Zoom App In-Client Home Page: Utilities" duration="0">
-        <h2 is-upgraded>Supabase Server Actions</h2>
-<p>Path:</p>
-<pre><code language="language-javascript" class="language-javascript">app/actions.ts
-</code></pre>
+        <p>In this section, you&#39;ll set up the essential utilities needed for integrating a Task Manager app with the Zoom client. This involves using Supabase as our backend and implementing a third-party OAuth flow to authenticate users inside the Zoom client.</p>
+<h2 is-upgraded>Supabase Server Actions</h2>
+<p>Set up a server action to handle requests to the Supabase authorize endpoint. This kicks off the authorization flow in an external browser, allowing users to authenticate securely.</p>
+<p><strong>File Path:</strong>: <code>app/actions.ts</code></p>
 <pre><code language="language-javascript" class="language-javascript">import crypto from &#34;crypto&#34;;
 
 ....
@@ -151,10 +151,9 @@ export const signInWithZoomApp = async () =&gt; {
   return { url: supabaseAuthUrl };
 };
 </code></pre>
-<h2 is-upgraded>Hide &#34;Sign in with Zoom&#34; Button</h2>
-<p>Path:</p>
-<pre><code language="language-javascript" class="language-javascript">components/auth/header-auth.tsx
-</code></pre>
+<h2 is-upgraded>UI Update: App Page</h2>
+<p>Make some UI adjustments to ensure a smooth user experience. Specifically, we&#39;ll hide the &#34;Sign in with Zoom&#34; button when the app is running inside the Zoom client, as it&#39;s no longer needed. Instead, we&#39;ll create a new button specifically for the Zoom client home page to handle authentication.</p>
+<p><strong>File Path: </strong><code>components/auth/header-auth.tsx</code></p>
 <pre><code language="language-javascript" class="language-javascript">return (
     &lt;div className=&#34;flex gap-2&#34;&gt;
       {!isZoom &amp;&amp; (
@@ -167,15 +166,12 @@ export const signInWithZoomApp = async () =&gt; {
 
 </code></pre>
 <h2 is-upgraded>Update App Page</h2>
-<p>Path</p>
-<pre><code>app/page.tsx
-</code></pre>
+<p>This section is a placeholder where no significant changes are made yet, but it&#39;s set up for future enhancements as needed.</p>
+<p><strong>File Path: </strong><code>app/page.tsx</code></p>
 <pre><code language="language-javascript" class="language-javascript">if (!isZoom) return &lt;div&gt;Zoom App Landing Page&lt;/div&gt;;
 </code></pre>
-<h2 is-upgraded>Middleware:  Zoom x-zoom-app-context Header and Cache management</h2>
-<p>Path:</p>
-<pre><code language="language-javascript" class="language-javascript">middleware.ts
-</code></pre>
+<h2 is-upgraded>Middleware: Zoom App Context Header &amp; Cache Management</h2>
+<p><strong>File Path: </strong><code>middleware.ts</code></p>
 <pre><code language="language-javascript" class="language-javascript">import { type NextRequest, NextResponse } from &#34;next/server&#34;;
 import { updateSession } from &#34;@/utils/supabase/middleware&#34;;
 import { upsertSupabaseUser } from &#34;@/app/lib/token-store&#34;;
@@ -244,10 +240,29 @@ export const config = {
 
       </google-codelab-step>
     
-      <google-codelab-step label="Zoom App In-Client Home Page" duration="0">
-        <p>Path:</p>
-<pre><code language="language-javascript" class="language-javascript">components/zoom-app.tsx
-</code></pre>
+      <google-codelab-step label="Zoom App in-client home page" duration="0">
+        <p>In this section, you will create the Zoom App in-client home page. It will handle  configuring the Zoom App SDK, register event listeners, and implement authentication for users accessing the app inside the Zoom client.</p>
+<h2 is-upgraded>Third-party OAuth: Supabase + Zoom OAuth Integration</h2>
+<p>Zoom Apps support OAuth within the client using the Zoom in-client OAuth flow. However, because Supabase handles its own OAuth process, the in-client flow is not compatible.</p>
+<p>To support Supabase authentication, the Zoom App must implement a third-party OAuth flow. This involves launching the Supabase OAuth URL in an external browser and managing the token exchange outside the Zoom client.</p>
+<h2 is-upgraded>1. Use the Zoom in-client OAuth flow</h2>
+<p>This method authenticates users within the Zoom client:</p>
+<p><strong>Steps:</strong></p>
+<ol type="1">
+<li>Call <code>zoomSdk.authorize</code> to initiate Zoom&#39;s in-client authorization.</li>
+<li>Register the <code>onAuthorized</code> event listener to complete the authentication process.</li>
+</ol>
+<h2 is-upgraded>2. Use the raw Supabase OAuth flow</h2>
+<p>This method authenticates users using an external browser:</p>
+<p><strong>Steps:</strong></p>
+<ol type="1">
+<li>Call <code>zoomSdk.openUrl</code> to open the Supabase OAuth URL externally.</li>
+<li>After redirecting, store the OAuth tokens in Redis using a <code>state</code> parameter.</li>
+<li>Retrieve tokens from Redis using the same <code>state</code> parameter.</li>
+<li>Call <code>supabase.auth.setSession</code> to initialize the Supabase session.</li>
+<li>Redirect the user to the dashboard.</li>
+</ol>
+<p>Path: <code>components/zoom-app.tsx</code></p>
 <pre><code language="language-javascript" class="language-javascript">&#34;use client&#34;;
 
 import { useEffect, useState, useRef } from &#34;react&#34;;
@@ -407,11 +422,12 @@ export default function ZoomAuth() {
 
       </google-codelab-step>
     
-      <google-codelab-step label="Zoom App Event: Zoom App Home URL" duration="0">
-        <p>Path:</p>
-<pre><code language="language-javascript" class="language-javascript">app/api/zoom/entry/route.ts
-</code></pre>
-<h3 is-upgraded>Get Route</h3>
+      <google-codelab-step label="Zoom App Home URL  Overview" duration="0">
+        <p>The Zoom App Home URL route is a key component in delivering a seamless user experience for your app. Each time a user opens your app, Zoom sends an event that includes the Zoom App Context header. This header contains valuable information about the user and any defined actions, which is especially useful if the user is deep-linked back into the Zoom client.</p>
+<p>In the context of using a third-party OAuth flow with Supabase, this route plays a crucial role. Since the Zoom App actions parameter is limited to 256 characters, embedding access and refresh tokens directly isn&#39;t feasible. Instead, you we will use the state value extracted from the action parameter to identify and authenticate users when they return to the in-client home page. This design enables a secure and efficient authentication flow from the browser back to the Zoom client.</p>
+<h2 is-upgraded>Handle the Zoom App Home URL Get Route</h2>
+<p>Create a route to decode the Zoom-App-Context header and redirect users to the Zoom App Home URL. Use the state parameter to retrieve the access and refresh tokens, and authenticate users upon their return to the Zoom client.</p>
+<p><strong>File Path: </strong><code>app/api/zoom/entry/route.ts</code></p>
 <pre><code language="language-javascript" class="language-javascript">import { type NextRequest, NextResponse } from &#34;next/server&#34;;
 import { decryptZoomAppContext } from &#34;@/app/lib/zoom-helper&#34;;
 import { updateSession } from &#34;@/utils/supabase/middleware&#34;;
@@ -550,9 +566,31 @@ async function handleActParam(
       </google-codelab-step>
     
       <google-codelab-step label="Zoom App External Page" duration="0">
-        <p>Path:</p>
-<pre><code language="language-javascript" class="language-javascript">app/zoom/launch/page.tsx
-</code></pre>
+        <p>In this section, you will create a page to process Supabase authentication tokens returned from a third-party OAuth flow and redirect the user back into the Zoom App client using a generated deeplink.</p>
+<h2 is-upgraded>Handle Zoom launch redirect</h2>
+<p>In this step, you will use a ZoomLaunchRedirectHandler component to:</p>
+<h3 is-upgraded>Step 1: Extract tokens from the redirect URL</h3>
+<p>Parse the URL hash (#) fragment to retrieve tokens such as:</p>
+<ul>
+<li>access_token</li>
+<li>refresh_token</li>
+<li>provider_token</li>
+<li>provider_refresh_token</li>
+<li>Extract the state value from the query string (?state=...), which is used to track the authentication context.</li>
+</ul>
+<h3 is-upgraded>Step 2: Generate a Zoom App deeplink</h3>
+<ul>
+<li>Construct a data payload with metadata (e.g., state, verified) and call the getDeeplink helper to retrieve a Zoom deeplink.</li>
+</ul>
+<h3 is-upgraded>Step 3: Send tokens to your backend</h3>
+<ul>
+<li>Send a request to your /api/zoom/entry endpoint with the state and the full token payload. This endpoint stores the tokens and prepares the Zoom App to authenticate the user.</li>
+</ul>
+<h3 is-upgraded>Step 4: Redirect to the Zoom App client</h3>
+<ul>
+<li>Open the Zoom App using the generated deeplink in a new tab. If the browser blocks the popup, display a fallback button so the user can open the Zoom App manually.</li>
+</ul>
+<p><strong>File Path: </strong><code>app/zoom/launch/page.tsx</code></p>
 <pre><code language="language-javascript" class="language-javascript">&#34;use client&#34;;
 
 import { useEffect, useState } from &#34;react&#34;;
