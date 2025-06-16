@@ -40,7 +40,11 @@
 <p>Part 6: <a href="https://just-zoomit.github.io/how-to-deep-link-zoom-client-za/#0" target="_blank">Integrate multi-feature app integration: Deep Linking</a></p>
 <p>Part 7: <a href="https://just-zoomit.github.io/how-to-integrate-webhooks-za/#0" target="_blank">Integrate multi-feature app integration: Webhooks</a></p>
 <p>Part 8: <a href="https://just-zoomit.github.io/how-to-integrate-slash-commands-za/#0" target="_blank">Integrate multi-feature app integration: Slash Commands</a></p>
-<p><strong>Part 9: </strong><a href="https://just-zoomit.github.io/how-to-integrate-zoom-app-sdk/#0" target="_blank"><strong>Integrate multi-feature app integration: Zoom App SDK</strong></a></p>
+<p><strong>Part 9: </strong><a href="https://just-zoomit.github.io/how-to-integrate-zoom-app-sdk/#0" target="_blank"><strong>Integrate multi-feature app integration: Zoom App SDK Third Party OAuth</strong></a></p>
+<p>Part 10: <a href="https://just-zoomit.github.io/build-collabo-meeting-experiences-zoomapp-sdk/#0" target="_blank">Build collaborative meeting experiences: Zoom App SDK</a></p>
+<p>Part 11: <a href="https://just-zoomit.github.io/how-to-build-collabo-meeting-experiences-zoom-app-sdk/#0" target="_blank">Build collaborative team chat experiences: Zoom App SDK Framework</a></p>
+<p>Part 12: <a href="https://just-zoomit.github.io/how-to-enable-zoomapp-rtms/#0" target="_blank">Enable Zoom App Real Time Media Streams: RTMS enable App</a></p>
+<p>Part 13: <a target="_blank"><strong>Embed the Zoom Meeting and Zoom Webinar experiences: Web Meeting SDK</strong></a></p>
 <p>⚠️ <strong>Warning:</strong> This guide assumes you&#39;re familiar building within the Zoom Workspace. You can start here or go back to the beginning of the full guide if you&#39;re new to Zoom App development.</p>
 <p>💡 <strong>Tip:</strong> If you don&#39;t have a paid workspace for development, you can join the <a href="https://api.slack.com/developer-program" target="_blank">Developer Program</a> and provision a sandbox with access to all Zoom Developer platform features for free.</p>
 
@@ -48,7 +52,7 @@
       </google-codelab-step>
     
       <google-codelab-step label="What you&#39;ll learn" duration="0">
-        <p>Build a Zoom App with integrated authorization flows for both Zoom and third-party services using Supabase.</p>
+        <p>How to build a Zoom App with integrated authorization flows for both Zoom and third-party services using Supabase.</p>
 <ul>
 <li>How to implement secure session management and authentication using middleware, Redis, and Supabase tokens</li>
 <li>How to create deep linking functionality to seamlessly connect external apps with the Zoom client</li>
@@ -78,7 +82,7 @@
 </ol>
 <pre><code language="language-bash" class="language-bash">git clone https://github.com/zoom/task-manager-sample.git
 cd task-manager-sample
-git checkout step-7-zoom-app-integration
+git checkout step-6-slash-command
 
 </code></pre>
 <ol type="1" start="2">
@@ -93,7 +97,7 @@ npm run dev
 
       </google-codelab-step>
     
-      <google-codelab-step label="Overview: Zoom App Integration" duration="0">
+      <google-codelab-step label="Overview: Zoom App Integration Third Party OAuth" duration="0">
         <p>This sample app includes reusable Redis cache, Zoom Rest API, and Zoom App helpers utility functions located in the app/lib folder. These functions help streamline chatbot, teamchat, cache management, and zoom rest api calls across both client and server environments.</p>
 <table>
 <tr><td colspan="1" rowspan="1"><p>File Path</p>
